@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
 
 pub struct CommandRunner {
@@ -30,31 +30,32 @@ impl CommandRunner {
 
         let stdout = res.stdout.take().expect("could not get stdout");
         let h1 = ::tokio::spawn(async move {
-            let reader = BufReader::new(stdout);
-            let mut lines = reader.lines();
+            let mut reader = BufReader::new(stdout);
 
-            for line in lines.next_line().await {
-                let line = match line {
-                    None => break,
-                    Some(s) => s,
+            let mut buf = [0; 4096];
+            loop {
+                let data = match reader.read(&mut buf).await {
+                    Err(_) => break,
+                    Ok(0) => break,
+                    Ok(size) => &buf[0..size],
                 };
 
-                println!("{:?}", line);
+                println!("{}", String::from_utf8_lossy(data));
             }
         });
 
         let stderr = res.stderr.take().expect("could not get stdout");
         let h2 = ::tokio::spawn(async move {
-            let reader = BufReader::new(stderr);
-            let mut lines = reader.lines();
-
-            for line in lines.next_line().await {
-                let line = match line {
-                    None => break,
-                    Some(s) => s,
+            let mut reader = BufReader::new(stderr);
+            let mut buf = [0; 4096];
+            loop {
+                let data = match reader.read(&mut buf).await {
+                    Err(_) => break,
+                    Ok(0) => break,
+                    Ok(size) => &buf[0..size],
                 };
 
-                println!("{:?}", line);
+                println!("{}", String::from_utf8_lossy(data));
             }
         });
 
