@@ -3,6 +3,9 @@ use async_channel::{Receiver, Sender};
 use walkdir::WalkDir;
 use structopt::StructOpt;
 use tokio::task::JoinHandle;
+use crate::command_runner::CommandRunner;
+
+mod command_runner;
 
 fn get_files(path : &str) -> Vec<PathBuf> {
 
@@ -17,6 +20,8 @@ fn get_files(path : &str) -> Vec<PathBuf> {
 
         buf.push(entry.into_path());
     }
+
+    // dbg!(&buf);
 
     buf
 }
@@ -59,8 +64,6 @@ async fn main() {
     for worker in workers.into_iter() {
         worker.await.expect("worker failed")
     }
-
-    println!("Hello, world!");
 }
 
 
@@ -78,7 +81,9 @@ async fn do_command(worker_opt: Opt, worker_file_provider : Receiver<PathBuf>) {
 
         i = i + 1;
 
+        let command_runner = CommandRunner::new(worker_opt.command.clone(), item);
+        command_runner.execute().await;
     }
 
-    println!("yay {:?}", i);
+    // println!("commandrunner finished");
 }
