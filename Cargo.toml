@@ -1,0 +1,13 @@
+[package]
+name = "easyparcli"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+walkdir = "2"
+structopt = "0.*"
+anyhow = "*"
+tokio = { version = "1.*", features = ["full"]}
+async-channel = "1.*"
