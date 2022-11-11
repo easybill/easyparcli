@@ -1,23 +1,59 @@
 use std::path::PathBuf;
+use std::process::ExitCode;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
+use crate::Opt;
 
 pub struct CommandRunner {
     file: PathBuf,
     cmd: String,
+    execute: bool,
 }
 
 impl CommandRunner {
-    pub fn new(cmd: String, file: PathBuf) -> Self {
+    pub fn new(opt: Opt, file: PathBuf) -> Self {
         Self {
-            cmd,
+            cmd: opt.command,
             file,
+            execute: opt.execute,
         }
     }
 
-    pub async fn execute(mut self) {
+    pub async fn execute(mut self) -> u32 {
+        let cmd = self.cmd
+            .replace("{{file}}", &{
+                let mut file = self.file.as_path().as_os_str().to_string_lossy().into_owned();
 
-        let cmd = self.cmd.replace("{{file}}", &self.file.as_path().as_os_str().to_string_lossy());
+                if file.starts_with("./") {
+                    file = file.replacen("./", "", 1);
+                }
+
+                file
+            })
+            .replace("{{directory}}", &{
+                match self.file.parent() {
+                    None => "".to_string(),
+                    Some(parent) => {
+                        let mut file = parent.as_os_str().to_string_lossy().into_owned();
+
+                        if file.starts_with("./") {
+                            file = file.replacen("./", "", 1);
+                        }
+
+                        if &file == "." {
+                            file = "".to_string();
+                        }
+
+                        file
+                    },
+                }
+            });
+
+        if !self.execute {
+            println!("execute: {}", &cmd);
+            return 0;
+        }
+
 
         let mut command = Command::new("bash");
         let command = command.arg("-c").arg(&cmd);
@@ -64,6 +100,7 @@ impl CommandRunner {
         h1.await.expect("stdout...");
         h2.await.expect("stderr...");
 
-        // println!("process finished with {}", &exit_status);
+        println!("process finished with {}, command: {}", &exit_status, &cmd);
+        exit_status.code().expect("no exit code") as u32
     }
 }

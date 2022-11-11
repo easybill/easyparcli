@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::process::exit;
 use async_channel::{Receiver, Sender};
 use walkdir::WalkDir;
 use structopt::StructOpt;
@@ -11,7 +12,7 @@ fn get_files(path : &str) -> Vec<PathBuf> {
 
     let mut buf = vec![];
 
-    for entry in WalkDir::new(path) {
+    for entry in WalkDir::new(path).follow_links(false) {
         let entry = entry.unwrap();
 
         if !entry.file_type().is_file() {
@@ -38,12 +39,14 @@ async fn vec_to_queue(vec: Vec<PathBuf>) -> (Sender<PathBuf>, Receiver<PathBuf>)
 
 #[derive(Debug, StructOpt, Clone)]
 #[structopt(name = "example", about = "An example of StructOpt usage.")]
-struct Opt {
+pub struct Opt {
     #[structopt(long = "files", default_value = ".")]
     pub files: String,
     #[structopt(long = "threads", default_value = "3")]
     pub threads: u32,
     pub command : String,
+    #[structopt(short, long)]
+    execute: bool,
 }
 
 #[tokio::main]
@@ -57,19 +60,29 @@ async fn main() {
         let worker_file_provider = file_provider.clone();
         let worker_opt = opt.clone();
         workers.push(::tokio::spawn(async move {
-            do_command(worker_opt, worker_file_provider).await;
+            do_command(worker_opt, worker_file_provider).await
         }));
     }
 
+    let mut exit_codes = vec![];
     for worker in workers.into_iter() {
-        worker.await.expect("worker failed")
+        exit_codes.extend(worker.await.expect("worker failed"));
     }
+
+    let success_codes = exit_codes.iter().filter(|code| **code == 0).collect::<Vec<_>>();
+    let error_codes = exit_codes.iter().filter(|code| **code != 0).collect::<Vec<_>>();
+
+    println!("{} successfull", success_codes.len());
+    println!("{} errors", error_codes.len());
 }
 
 
-async fn do_command(worker_opt: Opt, worker_file_provider : Receiver<PathBuf>) {
+
+
+async fn do_command(worker_opt: Opt, worker_file_provider : Receiver<PathBuf>) -> Vec<u32> {
 
     let mut i : u32 = 0;
+    let mut exit_codes = vec![];
 
     loop {
         let item = match worker_file_provider.recv().await {
@@ -81,9 +94,11 @@ async fn do_command(worker_opt: Opt, worker_file_provider : Receiver<PathBuf>) {
 
         i = i + 1;
 
-        let command_runner = CommandRunner::new(worker_opt.command.clone(), item);
-        command_runner.execute().await;
+        let command_runner = CommandRunner::new(worker_opt.clone(), item);
+        exit_codes.push(command_runner.execute().await);
     }
 
-    // println!("commandrunner finished");
+    println!("commandrunner finished");
+
+    exit_codes
 }
