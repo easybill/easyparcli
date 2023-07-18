@@ -2,9 +2,9 @@ use std::path::PathBuf;
 use std::process::exit;
 use async_channel::{Receiver, Sender};
 use walkdir::WalkDir;
-use structopt::StructOpt;
 use tokio::task::JoinHandle;
 use crate::command_runner::CommandRunner;
+use clap::Parser;
 
 mod command_runner;
 
@@ -37,21 +37,21 @@ async fn vec_to_queue(vec: Vec<PathBuf>) -> (Sender<PathBuf>, Receiver<PathBuf>)
     channel
 }
 
-#[derive(Debug, StructOpt, Clone)]
-#[structopt(name = "example", about = "An example of StructOpt usage.")]
+#[derive(Parser, Debug, Clone)]
+#[command(author, version, about, long_about = None)]
 pub struct Opt {
-    #[structopt(long = "files", default_value = ".")]
+    #[arg(long = "files", default_value = ".")]
     pub files: String,
-    #[structopt(long = "threads", default_value = "3")]
+    #[arg(long = "threads", default_value = "3")]
     pub threads: u32,
     pub command : String,
-    #[structopt(short, long)]
+    #[arg(short, long)]
     execute: bool,
 }
 
 #[tokio::main]
 async fn main() {
-    let opt : Opt = Opt::from_args();
+    let opt : Opt = Opt::parse();
 
     let (_, file_provider) = vec_to_queue(get_files(&opt.files)).await;
 

@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 walkdir = "2"
-structopt = "0.*"
+clap = { version="4.*", features = ["derive"] }
 anyhow = "*"
 tokio = { version = "1.*", features = ["full"]}
 async-channel = "1.*"
