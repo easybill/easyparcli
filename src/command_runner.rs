@@ -1,8 +1,7 @@
-use std::path::PathBuf;
-use std::process::ExitCode;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
-use tokio::process::Command;
 use crate::Opt;
+use std::path::PathBuf;
+use tokio::io::{AsyncReadExt, BufReader};
+use tokio::process::Command;
 
 pub struct CommandRunner {
     file: PathBuf,
@@ -19,10 +18,16 @@ impl CommandRunner {
         }
     }
 
-    pub async fn execute(mut self) -> u32 {
-        let cmd = self.cmd
+    pub async fn execute(self) -> u32 {
+        let cmd = self
+            .cmd
             .replace("{{file}}", &{
-                let mut file = self.file.as_path().as_os_str().to_string_lossy().into_owned();
+                let mut file = self
+                    .file
+                    .as_path()
+                    .as_os_str()
+                    .to_string_lossy()
+                    .into_owned();
 
                 if file.starts_with("./") {
                     file = file.replacen("./", "", 1);
@@ -45,7 +50,7 @@ impl CommandRunner {
                         }
 
                         file
-                    },
+                    }
                 }
             });
 
@@ -54,18 +59,17 @@ impl CommandRunner {
             return 0;
         }
 
-
         let mut command = Command::new("bash");
         let command = command.arg("-c").arg(&cmd);
 
-        command.stdin(::std::process::Stdio::piped());
-        command.stdout(::std::process::Stdio::piped());
-        command.stderr(::std::process::Stdio::piped());
+        command.stdin(std::process::Stdio::piped());
+        command.stdout(std::process::Stdio::piped());
+        command.stderr(std::process::Stdio::piped());
 
         let mut res = command.spawn().expect("could not spawn command");
 
         let stdout = res.stdout.take().expect("could not get stdout");
-        let h1 = ::tokio::spawn(async move {
+        let h1 = tokio::spawn(async move {
             let mut reader = BufReader::new(stdout);
 
             let mut buf = [0; 4096];
@@ -81,7 +85,7 @@ impl CommandRunner {
         });
 
         let stderr = res.stderr.take().expect("could not get stdout");
-        let h2 = ::tokio::spawn(async move {
+        let h2 = tokio::spawn(async move {
             let mut reader = BufReader::new(stderr);
             let mut buf = [0; 4096];
             loop {
@@ -94,7 +98,6 @@ impl CommandRunner {
                 println!("{}", String::from_utf8_lossy(data));
             }
         });
-
 
         let exit_status = res.wait().await.expect("process error ...");
         h1.await.expect("stdout...");
