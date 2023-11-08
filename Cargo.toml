@@ -8,4 +8,4 @@ walkdir = "2"
 clap = { version="4.*", features = ["derive"] }
 anyhow = "*"
 tokio = { version = "1.*", features = ["full"]}
-async-channel = "1.*"
+async-channel = "2.*"
